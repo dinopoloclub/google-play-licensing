@@ -45,6 +45,7 @@ public class AESObfuscator implements Obfuscator {
 
     private Cipher mEncryptor;
     private Cipher mDecryptor;
+    private SecretKey mSecret;
 
     /**
      * @param salt an array of random bytes to use for each (un)obfuscation
@@ -58,11 +59,9 @@ public class AESObfuscator implements Obfuscator {
             KeySpec keySpec =
                 new PBEKeySpec((applicationId + deviceId).toCharArray(), salt, 1024, 256);
             SecretKey tmp = factory.generateSecret(keySpec);
-            SecretKey secret = new SecretKeySpec(tmp.getEncoded(), "AES");
-            mEncryptor = Cipher.getInstance(CIPHER_ALGORITHM);
-            mEncryptor.init(Cipher.ENCRYPT_MODE, secret, new IvParameterSpec(IV));
-            mDecryptor = Cipher.getInstance(CIPHER_ALGORITHM);
-            mDecryptor.init(Cipher.DECRYPT_MODE, secret, new IvParameterSpec(IV));
+            mSecret = new SecretKeySpec(tmp.getEncoded(), "AES");
+            createEncryptor();
+            createDecryptor();
         } catch (GeneralSecurityException e) {
             // This can't happen on a compatible Android device.
             throw new RuntimeException("Invalid environment", e);
@@ -77,8 +76,10 @@ public class AESObfuscator implements Obfuscator {
             // Header is appended as an integrity check
             return Base64.encode(mEncryptor.doFinal((header + key + original).getBytes(UTF8)));
         } catch (UnsupportedEncodingException e) {
+            createEncryptor();
             throw new RuntimeException("Invalid environment", e);
         } catch (GeneralSecurityException e) {
+            createEncryptor();
             throw new RuntimeException("Invalid environment", e);
         }
     }
@@ -98,12 +99,40 @@ public class AESObfuscator implements Obfuscator {
             }
             return result.substring(header.length()+key.length(), result.length());
         } catch (Base64DecoderException e) {
+            createDecryptor();
             throw new ValidationException(e.getMessage() + ":" + obfuscated);
         } catch (IllegalBlockSizeException e) {
+            createDecryptor();
             throw new ValidationException(e.getMessage() + ":" + obfuscated);
         } catch (BadPaddingException e) {
+            createDecryptor();
             throw new ValidationException(e.getMessage() + ":" + obfuscated);
         } catch (UnsupportedEncodingException e) {
+            createDecryptor();
+            throw new RuntimeException("Invalid environment", e);
+        }
+    }
+
+    private void createEncryptor()
+    {
+        try {
+            mEncryptor = Cipher.getInstance(CIPHER_ALGORITHM);
+            mEncryptor.init(Cipher.ENCRYPT_MODE, mSecret, new IvParameterSpec(IV));
+        }
+        catch (GeneralSecurityException e) {
+        // This can't happen on a compatible Android device.
+        throw new RuntimeException("Invalid environment", e);
+        }
+    }
+
+    private void createDecryptor()
+    {
+        try {
+        mDecryptor = Cipher.getInstance(CIPHER_ALGORITHM);
+        mDecryptor.init(Cipher.DECRYPT_MODE, mSecret, new IvParameterSpec(IV));
+        }
+        catch (GeneralSecurityException e) {
+            // This can't happen on a compatible Android device.
             throw new RuntimeException("Invalid environment", e);
         }
     }
