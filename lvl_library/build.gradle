@@ -17,16 +17,20 @@ android {
     buildFeatures {
         aidl true
     }
+    publishing {
+        singleVariant('release')
+    }
 }
 
-publishing {
-    publications {
-        release(MavenPublication) {
-            groupId = 'com.github.dinopoloclub'
-            artifactId = 'google-play-licensing'
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                groupId = 'com.github.dinopoloclub'
+                artifactId = 'google-play-licensing'
+                version = '1.0.0'
 
-            afterEvaluate {
-                from components.findByName('release')
+                from components.release
             }
         }
     }
