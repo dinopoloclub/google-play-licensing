@@ -1,6 +1,8 @@
 apply plugin: 'com.android.library'
 apply plugin: 'maven-publish'
 
+group='com.github.dinopoloclub'
+
 android {
     namespace 'com.google.android.vending.licensing'
     compileSdk 34
