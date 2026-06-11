@@ -20,7 +20,7 @@ import android.content.SharedPreferences;
 import android.util.Log;
 
 /**
- * An wrapper for SharedPreferences that transparently performs data obfuscation.
+ * A wrapper for SharedPreferences that transparently performs data obfuscation.
  */
 public class PreferenceObfuscator {
 
@@ -58,7 +58,7 @@ public class PreferenceObfuscator {
                 result = mObfuscator.unobfuscate(value, key);
             } catch (ValidationException e) {
                 // Unable to unobfuscate, data corrupt or tampered
-                Log.w(TAG, "Validation error while reading preference: " + key);
+                Log.w(TAG, "Validation error while reading preference: " + key + "\n" + e.getMessage());
                 result = defValue;
             }
         } else {

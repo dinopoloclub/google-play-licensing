@@ -16,6 +16,8 @@
 
 package com.google.android.vending.licensing;
 
+import android.util.Log;
+
 import com.google.android.vending.licensing.util.Base64;
 import com.google.android.vending.licensing.util.Base64DecoderException;
 
@@ -36,6 +38,7 @@ import javax.crypto.spec.SecretKeySpec;
  * An Obfuscator that uses AES to encrypt data.
  */
 public class AESObfuscator implements Obfuscator {
+    private static final String TAG = "AESObfuscator";
     private static final String UTF8 = "UTF-8";
     private static final String KEYGEN_ALGORITHM = "PBEWITHSHAAND256BITAES-CBC-BC";
     private static final String CIPHER_ALGORITHM = "AES/CBC/PKCS5Padding";
@@ -43,9 +46,7 @@ public class AESObfuscator implements Obfuscator {
         { 16, 74, 71, -80, 32, 101, -47, 72, 117, -14, 0, -29, 70, 65, -12, 74 };
     private static final String header = "com.google.android.vending.licensing.AESObfuscator-1|";
 
-    private Cipher mEncryptor;
-    private Cipher mDecryptor;
-    private SecretKey mSecret;
+    private final SecretKey mSecret;
 
     /**
      * @param salt an array of random bytes to use for each (un)obfuscation
@@ -60,8 +61,6 @@ public class AESObfuscator implements Obfuscator {
                 new PBEKeySpec((applicationId + deviceId).toCharArray(), salt, 1024, 256);
             SecretKey tmp = factory.generateSecret(keySpec);
             mSecret = new SecretKeySpec(tmp.getEncoded(), "AES");
-            createEncryptor();
-            createDecryptor();
         } catch (GeneralSecurityException e) {
             // This can't happen on a compatible Android device.
             throw new RuntimeException("Invalid environment", e);
@@ -69,27 +68,27 @@ public class AESObfuscator implements Obfuscator {
     }
 
     public String obfuscate(String original, String key) {
+        Log.i(TAG, "Obfuscating data for key " + key);
         if (original == null) {
             return null;
         }
         try {
             // Header is appended as an integrity check
-            return Base64.encode(mEncryptor.doFinal((header + key + original).getBytes(UTF8)));
+            return Base64.encode(createEncryptor().doFinal((header + key + original).getBytes(UTF8)));
         } catch (UnsupportedEncodingException e) {
-            createEncryptor();
             throw new RuntimeException("Invalid environment", e);
         } catch (GeneralSecurityException e) {
-            createEncryptor();
             throw new RuntimeException("Invalid environment", e);
         }
     }
 
     public String unobfuscate(String obfuscated, String key) throws ValidationException {
+        Log.i(TAG, "Unobfuscating data for key " + key);
         if (obfuscated == null) {
             return null;
         }
         try {
-            String result = new String(mDecryptor.doFinal(Base64.decode(obfuscated)), UTF8);
+            String result = new String(createDecryptor().doFinal(Base64.decode(obfuscated)), UTF8);
             // Check for presence of header. This serves as a final integrity check, for cases
             // where the block size is correct during decryption.
             int headerIndex = result.indexOf(header+key);
@@ -99,25 +98,22 @@ public class AESObfuscator implements Obfuscator {
             }
             return result.substring(header.length()+key.length(), result.length());
         } catch (Base64DecoderException e) {
-            createDecryptor();
             throw new ValidationException(e.getMessage() + ":" + obfuscated);
         } catch (IllegalBlockSizeException e) {
-            createDecryptor();
             throw new ValidationException(e.getMessage() + ":" + obfuscated);
         } catch (BadPaddingException e) {
-            createDecryptor();
             throw new ValidationException(e.getMessage() + ":" + obfuscated);
         } catch (UnsupportedEncodingException e) {
-            createDecryptor();
             throw new RuntimeException("Invalid environment", e);
         }
     }
 
-    private void createEncryptor()
+    private Cipher createEncryptor()
     {
         try {
-            mEncryptor = Cipher.getInstance(CIPHER_ALGORITHM);
-            mEncryptor.init(Cipher.ENCRYPT_MODE, mSecret, new IvParameterSpec(IV));
+            Cipher encryptor = Cipher.getInstance(CIPHER_ALGORITHM);
+            encryptor.init(Cipher.ENCRYPT_MODE, mSecret, new IvParameterSpec(IV));
+            return encryptor;
         }
         catch (GeneralSecurityException e) {
         // This can't happen on a compatible Android device.
@@ -125,11 +121,12 @@ public class AESObfuscator implements Obfuscator {
         }
     }
 
-    private void createDecryptor()
+    private Cipher createDecryptor()
     {
         try {
-        mDecryptor = Cipher.getInstance(CIPHER_ALGORITHM);
-        mDecryptor.init(Cipher.DECRYPT_MODE, mSecret, new IvParameterSpec(IV));
+            Cipher decryptor = Cipher.getInstance(CIPHER_ALGORITHM);
+            decryptor.init(Cipher.DECRYPT_MODE, mSecret, new IvParameterSpec(IV));
+            return decryptor;
         }
         catch (GeneralSecurityException e) {
             // This can't happen on a compatible Android device.
